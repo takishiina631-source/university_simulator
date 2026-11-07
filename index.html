@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>大学模拟器 · 三条路</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --line: rgba(255,255,255,.12);
+    --text: #f0f0f6;
+    --muted: #b9b9c8;
+    --accent: #ffd166;
+    --up: #6fe3c9;
+    --down: #ff8f7e;
+  }
+  body {
+    min-height: 100vh;
+    background: #0b0d14;
+    color: var(--text);
+    font-family: "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", "Noto Sans CJK SC", system-ui, sans-serif;
+    line-height: 1.78;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* 全屏场景背景 */
+  .bg { position: fixed; inset: 0; z-index: 0; overflow: hidden; background: #0b0d14; }
+  .bg img {
+    position: absolute; inset: 0; width: 100%; height: 100%;
+    object-fit: cover; opacity: 0; transition: opacity .8s ease;
+    filter: brightness(0.65) saturate(1.1);
+  }
+  .bg img.on { opacity: 1; }
+  .bg::after {
+    content: ""; position: absolute; inset: 0;
+    background: linear-gradient(180deg, rgba(8,10,18,.62), rgba(8,10,18,.42) 40%, rgba(8,10,18,.78));
+  }
+  #app { position: relative; z-index: 1; max-width: 880px; margin: 0 auto; padding: 24px 18px 60px; }
+
+  header { display: flex; align-items: baseline; gap: 12px; flex-wrap: wrap; margin-bottom: 8px; }
+  .logo { font-size: 21px; font-weight: 700; letter-spacing: .1em; text-shadow: 0 2px 10px rgba(0,0,0,.6); }
+  .logo span { color: var(--accent); }
+  .toolbar { margin-left: auto; display: flex; gap: 8px; }
+  .tbtn {
+    cursor: pointer; font-family: inherit; font-size: 12.5px; color: var(--muted);
+    background: rgba(10,12,20,.55); border: 1px solid var(--line); border-radius: 999px;
+    padding: 5px 14px; transition: all .18s; backdrop-filter: blur(6px);
+  }
+  .tbtn:hover:not(:disabled) { color: #fff; border-color: rgba(255,209,102,.55); }
+  .tbtn:disabled { opacity: .35; cursor: default; }
+
+  .steps { display: flex; gap: 8px; align-items: center; margin: 10px 0 16px; }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.22); transition: all .3s; }
+  .dot.done { background: var(--accent); }
+  .dot.now { background: #fff; box-shadow: 0 0 0 4px rgba(255,255,255,.15); }
+  .steps-label { color: var(--muted); font-size: 12px; margin-left: 6px; letter-spacing: .1em; text-shadow: 0 1px 6px rgba(0,0,0,.7); }
+
+  .card {
+    border: 1px solid var(--line); border-radius: 20px;
+    background: rgba(12,14,24,.78); backdrop-filter: blur(14px);
+    padding: 30px 28px; box-shadow: 0 24px 70px rgba(0,0,0,.5);
+    animation: rise .45s ease both;
+  }
+  @keyframes rise { from { opacity: 0; transform: translateY(14px); } to { opacity: 1; transform: none; } }
+  .chapter { color: var(--accent); font-size: 12px; letter-spacing: .24em; margin-bottom: 8px; }
+  h1 { font-size: 27px; line-height: 1.4; margin-bottom: 6px; font-weight: 700; }
+  .intro-sub { color: var(--muted); font-size: 14px; margin-bottom: 16px; border-bottom: 1px solid var(--line); padding-bottom: 14px; }
+  .story p { font-size: 15.5px; margin-bottom: 12px; color: #e6e6f0; }
+  .quote { border-left: 3px solid var(--accent); padding: 2px 0 2px 14px; color: #d8d8e6; font-size: 15px; margin: 16px 0 0; font-style: italic; }
+
+  .choices { display: grid; gap: 12px; margin-top: 24px; }
+  .choice {
+    text-align: left; cursor: pointer; color: var(--text);
+    border: 1px solid var(--line); border-radius: 14px;
+    background: rgba(255,255,255,.045); padding: 15px 18px 15px 20px;
+    font-family: inherit; font-size: 15px; display: grid; gap: 5px;
+    position: relative; overflow: hidden; transition: transform .18s, border-color .18s, background .18s;
+  }
+  .choice::before { content: ""; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--accent); opacity: .4; transition: opacity .18s; }
+  .choice:hover { transform: translateY(-2px); border-color: rgba(255,209,102,.55); background: rgba(255,209,102,.08); }
+  .choice:hover::before { opacity: 1; }
+  .choice .tag { font-size: 11.5px; color: var(--accent); letter-spacing: .14em; }
+  .choice .title { font-weight: 700; font-size: 16px; }
+  .choice .desc { color: var(--muted); font-size: 13.5px; }
+  .lean { font-size: 11.5px; color: #9fb4d8; letter-spacing: .1em; }
+
+  .result-box { margin-top: 20px; padding: 18px 20px; border-radius: 14px; background: rgba(255,209,102,.08); border: 1px solid rgba(255,209,102,.25); font-size: 15px; color: #efeff8; }
+  .fb { margin-top: 14px; }
+  .fb div { font-size: 13.5px; color: #a9c3b8; margin-top: 6px; }
+  .fb div::before { content: "— "; color: #6fe3c9; }
+  .btn {
+    margin-top: 22px; cursor: pointer; font-family: inherit; border: none; border-radius: 12px;
+    padding: 13px 26px; font-size: 15px; font-weight: 700; color: #221a06;
+    background: linear-gradient(135deg, #ffe29a, var(--accent)); transition: transform .16s, box-shadow .16s;
+  }
+  .btn:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(255,209,102,.26); }
+  .btn.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); margin-left: 10px; font-weight: 500; }
+  .btn.ghost:hover { color: var(--text); box-shadow: none; }
+
+  .ending-title { font-size: 31px; margin: 4px 0 6px; }
+  .ending-code { color: var(--muted); font-size: 13px; letter-spacing: .18em; }
+  .ending-code b { color: #6fe3c9; font-weight: 600; }
+  .archive { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; margin: 20px 0 4px; }
+  .ar { border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; background: rgba(255,255,255,.04); }
+  .ar b { display: block; font-size: 20px; font-variant-numeric: tabular-nums; }
+  .ar span { font-size: 11.5px; color: var(--muted); }
+  .paths { margin-top: 18px; font-size: 13px; color: var(--muted); line-height: 1.95; }
+  .paths b { color: #d8d8e6; font-weight: 600; }
+  .paths .lk { color: var(--accent); }
+  .forks { margin-top: 16px; padding: 16px 18px; border-radius: 14px; border: 1px dashed rgba(255,209,102,.4); background: rgba(255,209,102,.06); font-size: 13.5px; color: #e2e2ee; }
+  .forks b { color: var(--accent); }
+  .forks div { margin-top: 6px; }
+  footer { text-align: center; color: #63637c; font-size: 12px; margin-top: 32px; }
+
+  /* 悬浮 Prompt 标签 */
+  .prompt-badge {
+    position: fixed; bottom: 18px; left: 18px; z-index: 10;
+    max-width: 420px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 11px; color: rgba(255, 255, 255, 0.7);
+    background: rgba(15, 18, 28, 0.85); border: 1px solid rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(8px); border-radius: 8px; padding: 8px 12px;
+    line-height: 1.45; pointer-events: none;
+  }
+  .prompt-badge b { color: var(--accent); font-weight: 600; display: block; margin-bottom: 2px; }
+
+  /* 结局页 AI 寄语卡片 */
+  .ai-card {
+    margin-top: 20px; padding: 20px; border-radius: 14px;
+    background: rgba(111, 227, 201, 0.06); border: 1px solid rgba(111, 227, 201, 0.3);
+    text-align: left;
+  }
+  .ai-header {
+    display: flex; align-items: center; gap: 8px; margin-bottom: 10px;
+    font-size: 13px; color: #6fe3c9; font-weight: 600; letter-spacing: .08em;
+  }
+  .ai-header::before {
+    content: ""; display: inline-block; width: 8px; height: 8px;
+    border-radius: 50%; background: #6fe3c9; box-shadow: 0 0 10px #6fe3c9;
+  }
+  .ai-stream-text {
+    font-size: 14.5px; line-height: 1.85; color: #e8f3ee; min-height: 54px;
+    white-space: pre-line;
+  }
+  .typing-cursor::after {
+    content: "▋"; display: inline-block; vertical-align: baseline;
+    color: #6fe3c9; animation: blink 1s step-start infinite;
+  }
+  @keyframes blink { 0%, 50% { opacity: 1; } 50.1%, 100% { opacity: 0; } }
+
+  @media (max-width: 720px) { .card { padding: 22px 18px; } h1 { font-size: 22px; } .ending-title { font-size: 25px; } }
+</style>
+</head>
+<body>
+<div class="prompt-badge" id="promptBadge" style="display: none;"></div>
+<div class="bg" id="bg"></div>
+<div id="app">
+  <header>
+    <div class="logo">大学模拟器 · <span>三条路</span></div>
+    <div class="toolbar">
+      <button class="tbtn" id="btnBack" onclick="goBack()">返回上一步</button>
+      <button class="tbtn" onclick="restart()">重新开始</button>
+    </div>
+  </header>
+  <div id="steps"></div>
+  <main id="stage"></main>
+  <footer>隐藏数值：学习能力 · 人际关系 · 实践经验 · 精力 —— 结局时揭晓 ｜ 插画为程序绘制的矢量场景</footer>
+</div>
+
+<script>
+/* ============ 章节图片与 Prompt Metadata ============ */
+var CHAPTER_IMG = {
+  ch1: "./assets/ch1_campus.jpg",
+  ch2: "./assets/ch2_lab.jpg",
+  ch3: "./assets/ch3_classroom.jpg",
+  ch4: "./assets/ch4_rain.jpg",
+  ch5: "./assets/ch5_grad.jpg"
+};
+
+var PROMPTS_META = {
+  ch1: "a university campus fork in the road during golden hour, autumn ginkgo leaves falling, anime Makoto Shinkai style --ar 16:9 --v 6.1",
+  ch2: "inside a modern university research laboratory at 2 AM, soft blue monitors glow, detailed anime scenery --ar 16:9 --v 6.1",
+  ch3: "sunlit university lecture amphitheater, warm morning light, wooden desks, quiet anime aesthetic --ar 16:9 --v 6.1",
+  ch4: "looking out from a dimly lit dorm window at heavy rain, blurry campus streetlights reflections, anime backdrop --ar 16:9 --v 6.1",
+  ch5: "wide university stadium track under a vast blue summer sky, graduation atmosphere, Makoto Shinkai style --ar 16:9 --v 6.1"
+};
+
+var CHNAMES = ['岔路口', '深入', '机会与交叉', '危机', '终局'];
+
+/* ============ 隐藏数值 ============ */
+var INIT = { study: 30, social: 30, practice: 20, energy: 70 };
+var ATTR_META = [
+  { key: 'study',    name: '学习能力', color: '#7fb2ff' },
+  { key: 'social',   name: '人际关系', color: '#ffb454' },
+  { key: 'practice', name: '实践经验', color: '#6fe3c9' },
+  { key: 'energy',   name: '精力',    color: '#ff8fae' }
+];
+var LEAN_NAME = { study: '专业学习', club: '社团活动', create: '兴趣创作' };
+
+/* ============ 五章剧情 ============ */
+var SCENES = {
+  ch1: {
+    img: 'ch1', time: '第一章 · 岔路口', title: '三条路同时朝你招手',
+    lead: '开学第二周，实验室的组会通知、社团的纳新摊位，和你自己那个没人知道的念头，同时摆在你面前。',
+    story: [
+      '辅导员说：大一先把专业打牢，别的都是虚的。',
+      '学长说：大学不进社团，你会后悔整整四年。',
+      '而你心里那个念头只在深夜出现——你想做一个完全属于自己的东西。'
+    ],
+    quote: '每个人都只有四年，但四年可以被切成无数种形状。',
+    choices: [
+      { lean: 'study', title: '跟着导师进组会，把专业学透', desc: '你坐进了会议室最边上的位置。', effects: { study: 18, energy: -6, practice: 4 },
+        result: '第一场组会你只听懂了一半，但你记满了七页笔记。走出教学楼时天已经黑了，你觉得那些陌生的词，好像也没那么可怕。' },
+      { lean: 'club', title: '加入那个热闹的社团', desc: '纳新摊位前人声鼎沸，你递上了报名表。', effects: { social: 18, energy: -6, study: -3 },
+        result: '你被拉进五个群，认识了三十七个新名字。当晚的破冰饭局上，你已经能喊出同桌一半人的外号。' },
+      { lean: 'create', title: '开始做那个没人知道的作品', desc: '你在二手平台买了块二手数位板/一台旧相机。', effects: { practice: 14, energy: -8, study: -4 },
+        result: '凌晨一点，你完成了第一份还拿不出手的小样。它很粗糙，但它是你的。你把它存进一个新建的文件夹，命名为「开始」。' }
+    ]
+  },
+
+  ch2: {
+    study: {
+      img: 'ch2', time: '第二章 · 深入（专业线）', title: '第一次组会',
+      lead: '你坐在会议室最边上的位置，白板上写着你听不懂的一半的词。',
+      story: [
+        '学长讲完，导师的目光落到你身上：「新来的同学，说说你的想法。」',
+        '你脑子里一片空白。但这一次，你不想再沉默下去。'
+      ],
+      quote: '深夜的走廊很静，静得能听见自己不肯服输的声音。',
+      choices: [
+        { lean: 'study', title: '每周多花十个小时啃文献', desc: '你把娱乐软件全删了。', effects: { study: 16, energy: -10 },
+          result: '三周后你第一次在组会上完整讲清了一篇论文的思路。导师点了点头，什么也没夸，但你注意到他在你的名字后面画了个圈。' },
+        { lean: 'club', title: '主动约学长请教，混个脸熟', desc: '专业的事，也可以用人的方式解决。', effects: { social: 10, study: 6, energy: -4 },
+          result: '学长请你喝了一杯三块钱的美式，把三年的弯路讲了一个晚上。后来他保研去了更好的学校，走之前把整箱文献留给了你。' },
+        { lean: 'create', title: '把组会学的东西做成可视化笔记', desc: '你把公式画成了图，发到了网上。', effects: { practice: 10, study: 6, energy: -6 },
+          result: '没人想到这种东西会有人看——第一条笔记停在了四百多次播放。评论区有人说：「讲得比课本清楚，求更新。」' }
+      ]
+    },
+    club: {
+      img: 'ch2', time: '第二章 · 深入（社团线）', title: '迎新晚会的后台',
+      lead: '你被临时推上去负责音响和流程。距离开场还有四十分钟，节目单还是乱的。',
+      story: [
+        '对讲机里全是声音，有人找主持人，有人找伴奏，节目三的歌手不见了。',
+        '部长在人群那头朝你喊：「你来排！」'
+      ],
+      quote: '混乱是检验一个人的最快方式。',
+      choices: [
+        { lean: 'club', title: '通宵重排节目单，撑住全场', desc: '你决定自己把这个场子扛下来。', effects: { social: 10, study: -6, energy: -10 },
+          result: '晚会零失误结束。你靠着音响睡到清洁阿姨来赶人。第二天的高数课你睡过了头，但社团里的每个人，从此都记住了你的名字。' },
+        { lean: 'club', title: '拉三个新成员成立应急小组', desc: '你不想一个人扛，你想要一支队伍。', effects: { social: 16, energy: -6 },
+          result: '你们四个人在楼梯间开了五分钟会，分工、对讲、跑位。晚会后你们被叫做「救场四人组」，这个组合后来撑起了社团整整两年。' },
+        { lean: 'create', title: '给晚会做一个倒计时动画', desc: '你熬了两个通宵，把黑暗中的等待做成了仪式。', effects: { practice: 14, social: 6, energy: -6 },
+          result: '灯一暗，全场安静。倒计时数字亮起的那一刻，一千多人一起举起了手机。部长看着你说：「明年晚会，视觉都交给你。」' }
+      ]
+    },
+    create: {
+      img: 'ch2', time: '第二章 · 深入（创作线）', title: '第一个作品发出去之后',
+      lead: '你把作品发到了网上。播放量：23。其中一半可能是你自己刷的。',
+      story: [
+        '你盯着那个数字看了很久，然后关掉手机，又忍不住打开。',
+        '有一条评论：「有点意思，但也没太有意思。」'
+      ],
+      quote: '创作者要过的第一关，是没有人看你。',
+      choices: [
+        { lean: 'create', title: '分析数据，重做第二版', desc: '你把那条刺眼的评论抄在了桌面上。', effects: { practice: 12, energy: -8 },
+          result: '第二版你改了四十多处。播放量涨到了三百——依然不多，但曲线是往上走的。你开始相信一件事：手艺是攒出来的。' },
+        { lean: 'club', title: '去评论区一个个回复，认识同好', desc: '作品是引子，人是礼物。', effects: { social: 12, practice: 4 },
+          result: '你认识了拍视频的、写歌的、剪片子的。你们组了个小群，取名「周三互看会」。世界忽然从一个观众，变成了一群同行者。' },
+        { lean: 'study', title: '回到专业课，先把基本功打牢', desc: '你意识到，所有好作品底下都得有真功夫。', effects: { study: 12, energy: -4 },
+          result: '你把创作按下暂停键，转攻专业课。期中考你进了年级前百分之二十。你没放弃那个文件夹，只是决定先给它攒点弹药。' }
+      ]
+    }
+  },
+
+  ch3: {
+    study: {
+      img: 'ch3', time: '第三章 · 机会（专业线深化）', title: '课题立项',
+      lead: '导师把一个没人要的子课题扔给了你。做成了是你的，做砸了也是你的。',
+      story: [
+        '「这个方向没人愿意做，」导师说，「你要不要试试？」',
+        '你听到了心跳声。这既是信任，也是一个只有你自己的战场。'
+      ],
+      quote: '机会来的时候，从来不会提前打招呼。',
+      choices: [
+        { lean: 'study', title: '全力把它做完', desc: '你申请了工位，把日程表排到了学期末。', effects: { study: 18, practice: 8, energy: -12 },
+          result: '学期末，子课题通过了中期检查。导师在组会上说「这是新同学做的」时，所有人都回头看你。你低着头，耳朵通红。' },
+        { lean: 'club', title: '拉两个同学一起做', desc: '一个人走得快，一群人走得远。', effects: { social: 12, practice: 8, study: 6, energy: -8 },
+          result: '你们仨把课题拆成三份，每周日晚在空教室碰头。课题做完了，你们也成了能互相保研拉一把的关系。' },
+        { lean: 'create', title: '把课题过程拍成系列短视频', desc: '做研究的人很多，把研究拍出来的人很少。', effects: { practice: 14, social: 8, study: 4, energy: -8 },
+          result: '「一个本科生的科研日常」更新到第八集，被学院官方账号转发了。导师看完只说了一句：「下一个课题，经费我批。」' }
+      ]
+    },
+    club: {
+      img: 'ch3', time: '第三章 · 机会（社团线深化）', title: '换届竞选',
+      lead: '社团换届，部长位置空了出来。有人提名了你，也有人觉得你资历不够。',
+      story: [
+        '竞选答辩定在周五晚上。报名表就放在活动室的桌上。',
+        '你的对手是大你一级的学姐，人脉、经验、气场，样样都在你之上。'
+      ],
+      quote: '有些位置，你不举手，就永远是别人的。',
+      choices: [
+        { lean: 'club', title: '准备演讲稿，正面竞选', desc: '你把两年的活动数据做成了三页纸。', effects: { social: 16, energy: -10 },
+          result: '你讲完最后一句，台下安静了两秒，然后掌声起来。票差七票——你输了，但学姐当场邀请你做执行部长：「明年，这个位置是你的。」' },
+        { lean: 'club', title: '不竞选，做那个什么都干的副手', desc: '你想用做事说话，而不是演讲。', effects: { social: 10, practice: 6, energy: -6 },
+          result: '一年里你经手了十场活动，零事故。换届那天没有演讲，学姐直接在群里@你：「下任部长，我不接受反驳。」' },
+        { lean: 'create', title: '退出核心层，把时间留给自己的事', desc: '热闹很好，但你心里另有一块地方在发光。', effects: { practice: 12, study: 6, energy: -4 },
+          result: '你退了群，却没退朋友。离开核心层后你反而看清了：组织能力还在，只是从今往后，你要为属于自己的项目工作。' }
+      ]
+    },
+    create: {
+      img: 'ch3', time: '第三章 · 机会（创作线深化）', title: '接到了商单',
+      lead: '有公司私信你：想用你的风格做一系列内容。报酬不错，但一切要按他们的来。',
+      story: [
+        '报价单上的数字，是你半年生活费的两倍。',
+        '但合同最后一页写着：甲方拥有最终修改权。'
+      ],
+      quote: '每个创作者都会遇到这道题：先吃饭，还是先做自己。',
+      choices: [
+        { lean: 'create', title: '接了，先赚钱养作品', desc: '你想活下去，再谈理想。', effects: { practice: 10, study: -4, energy: -8, social: 4 },
+          result: '两个月里你改了十九版，最后定稿的那版你已经认不出自己的风格。钱到账了，你用它买了新设备——然后卸载了甲方的群，三天没碰作品。' },
+        { lean: 'create', title: '拒绝，只做自己的东西', desc: '你把报价单截图存下来，当成墙上的警钟。', effects: { practice: 8, energy: -4 },
+          result: '你穷了一个月，但更新没断。第三个月，一个更大牌的品牌方找上门——这次合同写的是：「风格由创作者决定」。' },
+        { lean: 'club', title: '接单，但拉人成立小团队', desc: '一个人接不住的活，一群人可以。', effects: { social: 14, practice: 12, energy: -10 },
+          result: '你们四个人分工：你主创，有人商务，有人后期。商单交付那天，甲方多付了百分之二十。你们把这笔钱全买了设备。' }
+      ]
+    },
+    cross_sc: {
+      img: 'ch3', time: '第三章 · 交叉路口', title: '导师让你带队',
+      lead: '系里要办开放日，导师点名让你负责——因为你「既懂专业，又办得成事」。',
+      story: [
+        '前两次的选择，此刻叠在了一起：实验室认识的你，社团认识的你。',
+        '导师只给你一句话：「系里的脸面，交给你了。」'
+      ],
+      quote: '两条路走到深处，会自己长出一座桥。',
+      choices: [
+        { lean: 'study', title: '把开放日做成一场学术展览', desc: '你要让外行也看懂专业的浪漫。', effects: { study: 12, practice: 10, energy: -10 },
+          result: '你们把实验室搬到了展厅，家长和孩子围在最简单的演示装置前不肯走。院长参观完说：「明年就按这个办。」' },
+        { lean: 'club', title: '把它办成全系的联欢', desc: '你相信人多的地方，才有传播。', effects: { social: 16, practice: 8, energy: -10 },
+          result: '开放日变成了系的招牌活动，报名人数翻了一倍。教务处来问你要不要留校做行政——你第一次认真想了想「留下来」这件事。' },
+        { lean: 'club', title: '借机认识隔壁院的大牛，组跨课题组', desc: '你要的不是一场活动，是一张网。', effects: { social: 12, study: 8, energy: -8 },
+          result: '开放日结束当晚，你们五个人在烧烤摊上画出了跨院课题的草图。后来这个组拿下了大创国家级立项。' }
+      ]
+    },
+    cross_st: {
+      img: 'ch3', time: '第三章 · 交叉路口', title: '把你的作品变成课题',
+      lead: '专业课老师看完你的作品，愣了一下：「这个思路……可以做成一个正式课题。」',
+      story: [
+        '你一直以为创作和专业是两条平行线。这一刻，它们在你的桌上交汇了。',
+        '老师说：「做成了，这就是别人做不出的东西。」'
+      ],
+      quote: '最厉害的路，是把两条路走成一条。',
+      choices: [
+        { lean: 'study', title: '全力把它做成一篇正式课题', desc: '你决定让作品接受学术的检验。', effects: { study: 16, practice: 10, energy: -12 }, flags: ['bridge_st'],
+          result: '你把作品拆解、验证、写成规范文本。半年后课题通过结项，评语里有一句：「具有方法论层面的原创性。」' },
+        { lean: 'create', title: '课题照做，但作品保持独立', desc: '你不想让任何一边吞掉另一边。', effects: { practice: 14, study: 8, energy: -12 }, flags: ['bridge_st'],
+          result: '你同时维护着两个版本：严谨的课题版，和桀骜的作品版。很累，但你在答辩里讲前者、在展映里放后者，两边都站住了。' },
+        { lean: 'club', title: '拉上社团的朋友一起做', desc: '好点子不该只有一个人知道。', effects: { social: 10, practice: 10, study: 4, energy: -10 }, flags: ['bridge_st'],
+          result: '你们五个人把课题做成了展览+作品双输出。项目拿奖那天，老师说：「这不是我布置的课题，这是你们自己的东西。」' }
+      ]
+    },
+    cross_ct: {
+      img: 'ch3', time: '第三章 · 交叉路口', title: '社团晚会的片头是你做的',
+      lead: '你给社团做的六十秒片头，被校园号剪进推送，一夜之间转发破千。',
+      story: [
+        '第二天早上，你的私信列表排着二十多条未读。',
+        '有人想转载，有人想合作，还有人问：「你接不接毕业季的单子？」'
+      ],
+      quote: '流量从来不挑人，它只挑准备好了的人。',
+      choices: [
+        { lean: 'club', title: '趁热打铁，承包全校社团的内容', desc: '你要把这一天变成一条流水线。', effects: { social: 16, practice: 12, energy: -12 }, flags: ['bridge_ct'],
+          result: '一学期你做了十四个社团的片子，认识了半个学校的人。你的名字成了校园里的一块小招牌。' },
+        { lean: 'create', title: '只做一个栏目，慢慢养成', desc: '你要的不是热度，是属于自己的一块阵地。', effects: { practice: 14, social: 8, energy: -8 }, flags: ['bridge_ct'],
+          result: '「周三更新」的栏目做了三十七期，从没断更。粉丝不多，但个个是真观众。有人留言：「我追这个栏目，从大一追到现在。」' },
+        { lean: 'study', title: '回到课堂，把热度变成毕设选题', desc: '你决定让这份热闹，长出学术的根。', effects: { study: 12, practice: 8, energy: -8 },
+          result: '你的开题题目让答辩老师眼前一亮：「这个有真实案例支撑。」你心里清楚，那一千次转发就是你的案例库。' }
+      ]
+    }
+  },
+
+  ch4: {
+    study: {
+      img: 'ch4', time: '第四章 · 危机（专业线）', title: '实验失败了',
+      lead: '距离提交还有三周，核心数据全崩了。学长说：这个方向本来就有人做过，失败了很正常。',
+      story: [
+        '你盯着跑了一夜的程序输出，最后一行是报错。',
+        '导师出差了，群里没人说话。你知道，这一次没人能替你。'
+      ],
+      quote: '危机不问你准备好了没有，它只问你接下来做什么。',
+      choices: [
+        { lean: 'study', title: '推倒重来，换个思路再赌一次', desc: '三周，一次机会。', effects: { study: 12, practice: 10, energy: -14 },
+          result: '你睡了十九天 hostel 的沙发，换了第三种方法。提交前夜，曲线终于收敛。你没哭，只是把外卖软件里攒的优惠券全用掉了。' },
+        { lean: null, title: '换一个保守的题目，保证毕业', desc: '你决定不再跟自己较劲。', effects: { study: 6, energy: 4 },
+          result: '新题目两周就跑通了。顺利、安全、无趣。答辩通过那天你没什么感觉，只在很久后的某个深夜，想起那条没跑通的曲线。' },
+        { lean: 'club', title: '去找隔壁组合作，借他们的方法', desc: '你的面子，第一次派上了大用场。', effects: { social: 12, practice: 8, study: 6, energy: -8 },
+          result: '隔壁组的师兄把自己踩过的坑全告诉了你。你第一次体会到：人脉不是酒局，是有人愿意在你崩盘时接你一程。' }
+      ]
+    },
+    club: {
+      img: 'ch4', time: '第四章 · 危机（社团线）', title: '活动出了事故',
+      lead: '你负责的三百人活动，签到系统崩了。门口堵了半小时，有人的票根本没录进去。',
+      story: [
+        '投诉群瞬间九十九条，有人拍了视频发上网，配文「这就是你们的管理水平」。',
+        '指导老师打来电话，第一句是：「现在，谁出来面对？」'
+      ],
+      quote: '出事的时候，站在最前面的那个人，就是答案。',
+      choices: [
+        { lean: 'club', title: '站出来公开担责，给出补偿方案', desc: '你关掉群聊，走到门口人群前。', effects: { social: 14, energy: -10 },
+          result: '你拿着喇叭讲了三分钟，道歉、补偿、给出新入场方案。人群散了。当晚的帖子下面，最高赞评论变成：「负责的态度没问题。」' },
+        { lean: 'club', title: '先安抚，事后把问题归到流程', desc: '你想让这件事「体面地」过去。', effects: { social: 6, energy: 4 },
+          result: '事件淡下去了，复盘会开了一次就没了下文。你保住了体面，但你知道，系统还是那个系统，下次还会以同样的方式崩掉。' },
+        { lean: null, title: '从此退居幕后，不再接这种活', desc: '你被这次事故烫到了。', effects: { energy: 6, social: -6, practice: 4 },
+          result: '你转去做文档和物资，再没站到过人群前面。夜里你偶尔会想：如果当时站出来，会不会不一样。' }
+      ]
+    },
+    create: {
+      img: 'ch4', time: '第四章 · 危机（创作线）', title: '瓶颈与质疑',
+      lead: '有人说你「半年了还是老样子」，还有人翻出你早期的作品，说「借鉴痕迹很重」。',
+      story: [
+        '那条质疑的评论被顶到了最上面，点赞数还在涨。',
+        '你打开自己的作品列表，从头看到尾，第一次觉得：他们说得好有道理。'
+      ],
+      quote: '创作者真正的对手，从来不是同行，是自己心的保质期。',
+      choices: [
+        { lean: 'create', title: '停更一个月，闭关打磨新东西', desc: '你要用一个新作品回答所有问题。', effects: { practice: 16, energy: -8 },
+          result: '三十天里你推翻了两版方案。新作品上线那天，那条质疑评论被新评论淹没了——最高赞写着：「他回来了，而且不一样了。」' },
+        { lean: 'club', title: '公开回应，把创作过程全部摊开', desc: '你决定用透明对抗猜测。', effects: { social: 10, practice: 6, energy: -8 },
+          result: '你发了一条长文，附上所有参考来源和草稿。一半人被你说服，一半人依然骂你。但你发现，把底牌亮出来之后，你反而不怕了。' },
+        { lean: 'create', title: '不回应，接更多活用作品说话', desc: '你把愤怒调成了生产力。', effects: { practice: 12, energy: -12 },
+          result: '三个月你产出翻倍，质量起伏很大。质疑的声音渐渐没了——不是被说服了，是被更新频率淹没了。只有你自己知道，你有多累。' }
+      ]
+    },
+    balance: {
+      img: 'ch4', time: '第四章 · 危机（三线拉扯）', title: '被拉扯的人',
+      lead: '这学期，导师在催你，社团在等你，你的更新断更了二十天。三个世界同时向你要人。',
+      story: [
+        '你有四天没在凌晨两点前睡过，手机里躺着三条未回复的「在吗」。',
+        '你终于明白，这三条路你都在走，也都没走深。而现在，你必须选一个。'
+      ],
+      quote: '成年人的世界没有「都要」，只有「先要什么」。',
+      choices: [
+        { lean: 'study', title: '告诉所有人：这学期我以学业为主', desc: '你退了两个群，推了所有活动。', effects: { study: 16, social: -8, energy: 6 },
+          result: '你把社团工作做了交接，给合作方发了道歉信。学期末你拿到了奖学金，也在深夜想过：那些热闹里的人，还记得我吗。' },
+        { lean: 'club', title: '这学期，我压宝在社团上', desc: '你决定把最后一年交给那群人。', effects: { social: 16, study: -8, energy: 6 },
+          result: '你带着社团拿下了年度最佳。庆功宴上你喝多了，说的话没人记得，但你记得那天的灯光：很亮，很暖。' },
+        { lean: 'create', title: '告诉导师和社团：我要去做自己的东西', desc: '你终于说出了那句藏了很久的话。', effects: { practice: 16, study: -6, social: -4, energy: 6 },
+          result: '你说完之后，导师沉默了几秒，说：「去吧，年轻人该有自己想做的东西。」那天你更新了断更二十天的作品，播放量是平时的三倍。' }
+      ]
+    }
+  },
+
+  ch5: {
+    img: 'ch5', time: '终章 · 毕业前最后一个决定', title: '你要把四年押在哪里',
+    lead: '你拿到了深造的资格，也拿到了一份还算体面的工作邀请。同时，你心里还有一个念头在发光。',
+    story: [
+      '身边的人都在晒录取通知和三方协议。你的手机里，三条路安安静静地躺着。',
+      '辅导员说：稳定最重要。学长说：趁年轻去大城市。而你心里的声音说：你还记得你最早想做的那件事吗。'
+    ],
+    quote: '毕业不是终点，它只是第一次没有人替你安排下一步。',
+    choices: [
+      { lean: 'study', title: '接受深造，继续往上读', desc: '你想在自己选的领域里，再走深一步。', effects: { study: 18, energy: -8 },
+        result: '你在录取系统里点了确认。窗外是六月的梧桐，你忽然想起大一那个听不懂组会的自己——他要是看到今天，应该会挺高兴的。' },
+      { lean: null, title: '签了工作，先落地', desc: '你想先在这个世界上站稳，再谈别的。', effects: { practice: 10, study: 4, energy: 4 },
+        result: '你在三方协议上签了字。不是最耀眼的那份，但它能让你独立。你把存了很久的那个作品文件夹，认真地备份了三份。' },
+      { lean: 'create', title: '拒绝所有 offer，全职做自己的作品', desc: '四年了，你终于敢把这句话说出口。', effects: { practice: 16, social: 4, energy: -12 },
+        result: '你在出租屋里立起一张桌子，屏幕上是你的作品后台。前路未知，但你按下发布键的手，这一次没有抖。' }
+    ]
+  }
+};
+
+/* ============ 十种结局 ============ */
+var ENDINGS = {
+  burnout: { code: 'ENDING 01', title: '燃尽的人', sub: '什么都想要的人，最后什么都拿不动', text: [
+    '你什么都想要：绩点、活动、作品、朋友。前三年，你也真的都快够到了。',
+    '倒下不是在某个戏剧性的瞬间，而是在一个再普通不过的早晨——你盯着天花板，发现自己什么都不想干了。',
+    '你请了一学期的假。躺在床上的日子你想了很多：如果当初只选一件事，是不是就不会是现在这样。'],
+    wish: '所有长期主义的前提，是你还在场。' },
+  thesis_art: { code: 'ENDING 02 · 隐藏结局', title: '作品即论文', sub: '你把两条路，走成了一条', text: [
+    '你的毕业设计最后成了两样东西：一篇正式发表的论文，和一件被学院收藏的作品。',
+    '答辩那天，评委翻完你的材料，抬头问：「这两样，真的都是你一个人主导的？」',
+    '你想起当年把组会内容做成可视化笔记的深夜。那时候，没有人觉得那会有什么用。'],
+    wish: '最厉害的路，是把两条路走成一条。' },
+  viral: { code: 'ENDING 03 · 隐藏结局', title: '一夜爆红之后', sub: '流量来过，而你没有被淹死', text: [
+    '那条片头被大号搬运之后，最高播放停在了两百一十万。',
+    '你经历过膨胀、掉粉、被质疑「恰烂钱」、和平台讨价还价，也在某个凌晨三点删掉过一条差点毁掉一切的内容。',
+    '毕业时，你的账号就是你的简历。有公司开价挖你，你说：我再想想。'],
+    wish: '流量是浪，会游泳的人才能借它过河。' },
+  scholar: { code: 'ENDING 04 · 学术线', title: '学术之路', sub: '那些坐得住的夜晚，都变成了底气', text: [
+    '保研名单公布那天，你在上面找到了自己的名字，然后平静地去吃了碗面。',
+    '组会、文献、投稿、被拒、修改、再投。你第一次体会到「坐冷板凳」四个字的具体形状。',
+    '开题通过那天，导师说了一句：「你这孩子，坐得住。」'],
+    wish: '深挖一口井的人，迟早会见到水。' },
+  creator: { code: 'ENDING 05 · 创作线', title: '作品说话', sub: '你的账号，就是你的简历', text: [
+    '你拒绝了很多「更稳妥」的路，把四年几乎全押在了作品上。',
+    '毕业时你的作品集比任何成绩单都厚：账号、案例、合作过的人，全都是真的。',
+    '有人说你「赌赢了」。只有你知道，那不是赌——那是你每天起床后，唯一想做的事。'],
+    wish: '把一件事做到极致，世界自会给你让路。' },
+  organizer: { code: 'ENDING 06 · 社团线', title: '幕后的人', sub: '每场顺利的活动背后，都有你', text: [
+    '你没有站在过台前，但四年里每一场顺利的活动，背后都有你排的表、盯的场、垫的资、扛的锅。',
+    '毕业晚会最后，主持人说：「感谢所有幕后的同学。」掌声响起时，你站在音响旁边，眼眶有点热。',
+    '你后来进了管培生项目。面试官说：我们在你身上看到了「能成事」三个字。'],
+    wish: '有些人天生该站在光后面，让光更亮。' },
+  explorer: { code: 'ENDING 07 · 交叉线', title: '跨界的人', sub: '说不清专业，但哪里都缺', text: [
+    '你的简历很难被归类：一半是专业，一半是热爱，中间缝着你自己的东西。',
+    '面试时你把同一个故事讲了很多遍：怎么把课题做成展览，怎么给数据做可视化。每次讲完，对面的人都会往前倾一点。',
+    '你成了那种「说不清具体专业，但哪里都缺」的人。'],
+    wish: '缝隙里长出来的人，最能扛住风。' },
+  media: { code: 'ENDING 08 · 交叉线', title: '内容创作者', sub: '热爱真的可以当饭吃', text: [
+    '你和几个伙伴把爱好做成了工作室：接学校的活、接商单、接外包，一单一单地攒。',
+    '毕业那天，工作室账上余额不多，但作品列表很长。团队的名字换过两次，人一个都没散。',
+    '你们在出租屋里吃了顿火锅，白板上写着下个季度的选题。'],
+    wish: '热爱能当饭吃的前提，是你真的把它当饭做。' },
+  reliable: { code: 'ENDING 09 · 交叉线', title: '靠得住的人', sub: '靠谱，是最被低估的天赋', text: [
+    '你的成绩中上，人缘很好，经手的事从来没有掉在地上过。',
+    '毕业季，老师找你帮忙、同学找你商量、朋友找你吐苦水。你被需要着，也确实扛住了。',
+    '有人问你累不累。你说累，但下次还是会答应——因为你做不到看着事情砸了。'],
+    wish: '靠谱最累，但世界最终会把最重要的事交给靠得住的人。' },
+  ordinary: { code: 'ENDING 10', title: '普通的毕业', sub: '每条路都走了几步，没有一条走到头', text: [
+    '你试过几条路：去过组会，进过社团，也剪过视频。每一条都走了几步，没有一条走到头。',
+    '毕业时你的简历普普通通。你有点不甘心，又说不清自己在不甘心什么。',
+    '回家的火车上你想通了一件事：下一次，至少要把一件事做完。'],
+    wish: '没有全力以赴的人生，输的不是结果，是那句「如果当时」。' }
+};
+
+/* ============ 状态与逻辑 ============ */
+var state = null;
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+function newGame() { state = { picks: [], step: 0, lastEffects: null }; }
+
+function leanOf(i) { return chapterChoices(state.picks, i)[state.picks[i]].lean; }
+function chapterChoices(picks, i) {
+  if (i === 0) return SCENES.ch1.choices;
+  if (i === 4) return SCENES.ch5.choices;
+  if (i === 1) return SCENES.ch2[SCENES.ch1.choices[picks[0]].lean].choices;
+  if (i === 2) {
+    var l1 = SCENES.ch1.choices[picks[0]].lean;
+    var l2 = SCENES.ch2[SCENES.ch1.choices[picks[0]].lean].choices[picks[1]].lean;
+    if (l1 === l2) return SCENES.ch3[l1].choices;
+    var key = [l1, l2].sort().join('_');
+    var map = { club_create: 'cross_ct', club_study: 'cross_sc', create_study: 'cross_st' };
+    return SCENES.ch3[map[key]].choices;
+  }
+  if (i === 3) {
+    var ls = [];
+    for (var k = 0; k < 3; k++) ls.push(chapterChoices(picks, k)[picks[k]].lean);
+    var c = { study: 0, club: 0, create: 0 };
+    ls.forEach(function (x) { c[x]++; });
+    if (c.study && c.club && c.create) return SCENES.ch4.balance.choices;
+    for (var kk in c) if (c[kk] >= 2) return SCENES.ch4[kk].choices;
+    return SCENES.ch4.balance.choices;
+  }
+  return [];
+}
+
+function replay(picks) {
+  var attrs = Object.assign({}, INIT), flags = [], scenes = [];
+  for (var i = 0; i < 5; i++) {
+    var choices = chapterChoices(picks, i);
+    var c = choices[picks[i]];
+    for (var k in c.effects) attrs[k] = clamp(attrs[k] + c.effects[k]);
+    (c.flags || []).forEach(function (f) { if (flags.indexOf(f) < 0) flags.push(f); });
+    scenes.push(c);
+  }
+  var st = { attrs: attrs, flags: flags };
+  return { attrs: attrs, flags: flags, choices: scenes, ending: computeEnding(st) };
+}
+
+function computeEnding(st) {
+  var a = st.attrs, f = st.flags;
+  var c = { study: 0, club: 0, create: 0 };
+  (st.leans || []).forEach(function (x) { if (x) c[x]++; });
+  if (a.energy <= 25) return 'burnout';
+  if (f.indexOf('bridge_st') >= 0 && c.study >= 2 && c.create >= 2) return 'thesis_art';
+  if (f.indexOf('bridge_ct') >= 0 && c.club >= 2 && c.create >= 2) return 'viral';
+  if (c.study >= 3) return 'scholar';
+  if (c.create >= 3) return 'creator';
+  if (c.club >= 3) return 'organizer';
+  var maxc = Math.max(c.study, c.club, c.create);
+  if (maxc <= 2 && a.energy <= 45) return 'ordinary';
+  var top = ['study', 'club', 'create'].sort(function (x, y) {
+    var d = c[y] - c[x];
+    if (d) return d;
+    return (y === 'study' ? a.study : y === 'club' ? a.social : a.practice) - (x === 'study' ? a.study : x === 'club' ? a.social : a.practice);
+  });
+  var pair = [top[0], top[1]].sort().join('_');
+  if (pair === 'create_study') return 'explorer';
+  if (pair === 'club_create') return 'media';
+  return 'reliable';
+}
+
+function replayWithLeans(picks) {
+  var r = replay(picks);
+  r.leans = picks.map(function (p, i) { return chapterChoices(picks, i)[p].lean; });
+  r.ending = computeEnding(r);
+  return r;
+}
+
+function findForks(picks, base) {
+  var res = [];
+  for (var i = 0; i < 5; i++) {
+    var choices = chapterChoices(picks, i);
+    for (var j = 0; j < choices.length; j++) {
+      if (j === picks[i]) continue;
+      var alt = picks.slice(); alt[i] = j;
+      var e = replayWithLeans(alt).ending;
+      if (e !== base) { res.push({ i: i, j: j, ending: e }); break; }
+    }
+  }
+  return res;
+}
+
+/* ============ 渲染与 AIGC 扩展逻辑 ============ */
+var stage = document.getElementById('stage');
+var stepsBox = document.getElementById('steps');
+var bgBox = document.getElementById('bg');
+
+function current() { return replayWithLeans(state.picks); }
+
+function setBg(key) {
+  var src = CHAPTER_IMG[key];
+  if (bgBox.dataset.cur === src) return;
+  bgBox.dataset.cur = src;
+  bgBox.innerHTML = '<img src="' + src + '" alt="">';
+  var img = bgBox.firstChild;
+  img.onload = function() { img.classList.add('on'); };
+  if (img.complete) img.classList.add('on');
+
+  // 更新左下角的 Prompt 标签
+  var badge = document.getElementById('promptBadge');
+  if (PROMPTS_META[key]) {
+    badge.style.display = 'block';
+    badge.innerHTML = '<b>AIGC SCENE PROMPT:</b>' + PROMPTS_META[key];
+  } else {
+    badge.style.display = 'none';
+  }
+}
+
+/* 模拟 AI 观察者评估生成 */
+function generateAIEvaluation(r) {
+  var a = r.attrs;
+  var intro = "【AI 观察者系统正在解析你的大学四年运行日志...】\n";
+  var coreTrait = "";
+  
+  if (a.energy <= 25) {
+    coreTrait = "在数据底层，检测到你在精力阈值边缘频繁预警，你总试图把每一条支线都推向尽头。";
+  } else if (a.study >= 65 && a.practice >= 50) {
+    coreTrait = "你展现了极为罕见的『知行耦合度』，不仅在纯学术深度上扎下了根，还具备将推导转化为具象实物的行动力。";
+  } else if (a.social >= 65) {
+    coreTrait = "数据网络显示你构建了一个强连接的人际中枢，在群体面临变故的时刻，你总是不自觉地扮演了压舱石角色。";
+  } else {
+    coreTrait = "你在多个向量之间维持了温和的平衡，未曾盲信单一维度的评价指标。";
+  }
+
+  var advice = "";
+  switch (r.ending) {
+    case 'thesis_art':
+      advice = "你跨越了专业与表达的界限。未来的网络媒体环境最需要的正是这种不受单一学科禁锢的复合型节点。保持你的不妥协。";
+      break;
+    case 'scholar':
+      advice = "坐冷板凳是一种算法很难模拟的耐力。愿你在更高层级的学术洪流里，始终保留最初对未知的那份纯粹饥饿感。";
+      break;
+    case 'creator':
+      advice = "你的作品列表已经沉淀为唯一的专属资产。请记住：工具与流量都会迭代，但你的独特观察力不可被算力替代。";
+      break;
+    default:
+      advice = "大学不是一个单向执行的函数，没有绝对最优解。走过的路，每一步都会以隐性特征的形式编织进你的下一阶段。";
+  }
+
+  return intro + coreTrait + "\n\n" + advice;
+}
+
+/* 打字机平滑流式输出 */
+function startTyping(text, elementId, speed) {
+  var el = document.getElementById(elementId);
+  if (!el) return;
+  el.classList.add('typing-cursor');
+  el.textContent = "";
+  var idx = 0;
+  var timer = setInterval(function() {
+    el.textContent += text.charAt(idx);
+    idx++;
+    if (idx >= text.length) {
+      clearInterval(timer);
+      el.classList.remove('typing-cursor');
+    }
+  }, speed || 24);
+}
+
+function renderSteps() {
+  var html = '<div class="steps">';
+  for (var i = 0; i < 5; i++) html += '<div class="dot ' + (i < state.step ? 'done' : (i === state.step ? 'now' : '')) + '"></div>';
+  html += '<div class="steps-label">' + CHNAMES[Math.min(state.step, 4)] + '</div></div>';
+  stepsBox.innerHTML = html;
+  document.getElementById('btnBack').disabled = state.picks.length === 0;
+}
+
+function sceneMeta(i) {
+  var choices = chapterChoices(state.picks, i);
+  var imgKey = { 0: 'ch1', 1: 'ch2', 2: 'ch3', 3: 'ch4', 4: 'ch5' }[i];
+  var sc;
+  if (i === 0) sc = SCENES.ch1;
+  else if (i === 1) sc = SCENES.ch2[SCENES.ch1.choices[state.picks[0]].lean];
+  else if (i === 2) {
+    var l1 = SCENES.ch1.choices[state.picks[0]].lean;
+    var l2 = SCENES.ch2[l1].choices[state.picks[1]].lean;
+    sc = l1 === l2 ? SCENES.ch3[l1] : SCENES.ch3[{ club_create: 'cross_ct', club_study: 'cross_sc', create_study: 'cross_st' }[[l1, l2].sort().join('_')]];
+  } else if (i === 3) {
+    var c = { study: 0, club: 0, create: 0 };
+    [0, 1, 2].forEach(function (k) { c[chapterChoices(state.picks, k)[state.picks[k]].lean]++; });
+    sc = (c.study && c.club && c.create) ? SCENES.ch4.balance : SCENES.ch4[(c.study >= 2 && 'study') || (c.club >= 2 && 'club') || (c.create >= 2 && 'create') || 'balance'];
+  } else sc = SCENES.ch5;
+  return { scene: sc, choices: choices, imgKey: imgKey, variant: sc.title };
+}
+
+function feedback(effects) {
+  var m = [];
+  if (effects.study >= 12) m.push('你对专业的理解，明显深了一层');
+  else if (effects.study > 0) m.push('你感觉专业课没那么陌生了');
+  if (effects.study < 0) m.push('你落下了不少课，心里有点虚');
+  if (effects.social >= 12) m.push('你身边能说话的人，肉眼可见地变多了');
+  else if (effects.social > 0) m.push('你多认识了几个靠得住的人');
+  if (effects.social < 0) m.push('热闹是他们的，你有点被落下了');
+  if (effects.practice >= 12) m.push('你的手，比脑子先动起来了');
+  else if (effects.practice > 0) m.push('想法开始变成做得出来的东西');
+  if (effects.energy <= -10) m.push('你最近总是很累，照镜子时吓了自己一跳');
+  else if (effects.energy < 0) m.push('你有点累了，但还扛得住');
+  if (effects.energy >= 5) m.push('难得地，你睡了个好觉');
+  return m;
+}
+
+function renderIntro() {
+  setBg('ch1');
+  stage.innerHTML = '<div class="card">'
+    + '<div class="chapter">SIMULATOR · 三条路</div>'
+    + '<h1>大学模拟器 · 三条路</h1>'
+    + '<div class="intro-sub">专业学习、社团活动、兴趣创作——每一次选择都会真实改变你之后遇到的场景。没有固定的剧本，只有你走出来的那条。</div>'
+    + '<div class="story">'
+    + '<p>四项隐藏数值（学习能力、人际关系、实践经验、精力）在你每次选择后悄悄变动，结局时揭晓。</p>'
+    + '<p><b>剧情会分支</b>：你在第二章遇到什么，取决于第一章选了什么；第三章可能触发「交叉事件」，第四章的危机由你的轨迹决定。某些结局，只有特定的路线组合才能解锁。</p>'
+    + '<p>随时可以<b>返回上一步</b>重新选择，结局会告诉你：哪一步真正改写了你的人生。</p></div>'
+    + '<div class="quote">每个人都只有四年，但四年可以被切成无数种形状。</div>'
+    + '<button class="btn" onclick="startGame()">开始你的大学</button></div>';
+}
+
+function startGame() { newGame(); renderScene(); }
+function restart() { renderIntro(); }
+
+function goBack() {
+  if (!state) return;
+  if (state.picks.length === 0) { renderIntro(); return; }
+  state.picks.pop();
+  state.step = state.picks.length;
+  renderScene();
+}
+
+function renderScene() {
+  var i = state.step;
+  var m = sceneMeta(i);
+  var s = m.scene;
+  setBg(s.img);
+  renderSteps();
+  var html = '<div class="card"><div class="chapter">' + s.time + '</div>'
+    + '<h1>' + s.title + '</h1>'
+    + '<div class="intro-sub">' + s.lead + '</div><div class="story">';
+  s.story.forEach(function (p) { html += '<p>' + p + '</p>'; });
+  html += '</div><div class="quote">' + s.quote + '</div><div class="choices">';
+  m.choices.forEach(function (c, k) {
+    html += '<button class="choice" onclick="pick(' + k + ')">'
+      + '<span class="tag">选择 ' + 'ABC'[k] + '</span>'
+      + '<span class="title">' + c.title + '</span>'
+      + '<span class="desc">' + c.desc + '</span>'
+      + (c.lean ? '<span class="lean">倾向 · ' + LEAN_NAME[c.lean] + '</span>' : '')
+      + '</button>';
+  });
+  html += '</div><div style="margin-top:14px"><button class="tbtn" onclick="goBack()">返回上一步</button></div></div>';
+  stage.innerHTML = html;
+}
+
+function pick(k) {
+  var m = sceneMeta(state.step);
+  var c = m.choices[k];
+  state.picks.push(k);
+  state.step++;
+  state.lastEffects = c.effects;
+  renderSteps();
+  var last = state.step === 5;
+  var fb = feedback(c.effects).map(function (x) { return '<div>' + x + '</div>'; }).join('');
+  stage.innerHTML = '<div class="card"><div class="chapter">' + m.scene.time + ' · 你的选择</div>'
+    + '<h1>' + c.title + '</h1>'
+    + '<div class="result-box">' + c.result + '</div>'
+    + (fb ? '<div class="fb">' + fb + '</div>' : '')
+    + '<button class="btn" onclick="' + (last ? 'showEnding()' : 'renderScene()') + '">'
+    + (last ? '看看你的结局' : '继续') + '</button>'
+    + '<button class="btn ghost" onclick="goBack()">返回上一步</button></div>';
+}
+
+function showEnding() {
+  var r = current(), e = ENDINGS[r.ending], a = r.attrs;
+  setBg('ch5');
+  
+  var aiText = generateAIEvaluation(r);
+
+  var html = '<div class="card"><div class="chapter">毕业那天</div>'
+    + '<div class="ending-code">' + e.code + ' ｜ <b>隐藏数值揭晓</b></div>'
+    + '<h1 class="ending-title">' + e.title + '</h1>'
+    + '<div class="intro-sub">' + e.sub + '</div><div class="story">';
+  e.text.forEach(function (p) { html += '<p>' + p + '</p>'; });
+  html += '</div><div class="quote">' + e.wish + '</div>';
+
+  // 插入 AI 寄语打字机卡片
+  html += '<div class="ai-card">'
+    + '<div class="ai-header">NEURAL ADVISOR · AI 观察者评估</div>'
+    + '<div class="ai-stream-text" id="aiStream"></div>'
+    + '</div>';
+
+  html += '<div class="archive">';
+  ATTR_META.forEach(function (x) {
+    html += '<div class="ar"><b style="color:' + x.color + '">' + a[x.key] + '</b><span>' + x.name + '</span></div>';
+  });
+  html += '</div><div class="paths"><b>你的路线</b><br>';
+  state.picks.forEach(function (p, i) {
+    var ch = chapterChoices(state.picks, i)[p];
+    var ln = ch.lean ? ' <span class="lk">' + LEAN_NAME[ch.lean] + '</span>' : '';
+    html += '第' + (i + 1) + '章 ' + 'ABC'[p] + ' ' + ch.title + ln + '<br>';
+  });
+  html += '</div>';
+
+  var forks = findForks(state.picks, r.ending);
+  if (forks.length) {
+    html += '<div class="forks"><b>真正改写结局的，是这几步</b>';
+    forks.forEach(function (fk) {
+      var ch = chapterChoices(state.picks, fk.i)[fk.j];
+      html += '<div>· 如果第' + (fk.i + 1) + '章选 ' + 'ABC'[fk.j] + '（' + ch.title + '），你会走向《' + ENDINGS[fk.ending].title + '》</div>';
+    });
+    html += '</div>';
+  } else {
+    html += '<div class="forks"><b>这一次，你走得非常坚定</b><div>· 换掉其中任何一步，你依然会走向《' + e.title + '》。有些人生，是被性格决定的。</div></div>';
+  }
+
+  html += '<div style="margin-top:20px;"><button class="btn" onclick="startGame()">再走一次（试试别的路）</button>'
+    + '<button class="btn ghost" onclick="restart()">回到封面</button></div></div>';
+  
+  stage.innerHTML = html;
+  renderSteps();
+
+  // 稍微延迟 300 毫秒启动打字机，营造生成感
+  setTimeout(function() {
+    startTyping(aiText, "aiStream", 25);
+  }, 300);
+}
+
+renderIntro();
+</script>
+</body>
+</html>
